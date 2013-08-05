@@ -4,7 +4,7 @@ from ui import ChatUI
 def main(stdscr):
     stdscr.clear()
     ui = ChatUI(stdscr)
-    name = ui.prompt("Username: ")
+    name = ui.wait_input("Username: ")
     ui.userlist.append(name)
     ui.redraw_userlist()
     inp = ""

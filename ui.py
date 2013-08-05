@@ -32,7 +32,7 @@ class ChatUI:
     def redraw_chatline(self):
         """Redraw the user input textbox"""
         h, w = self.win_chatline.getmaxyx()
-        #self.win_chatline.addstr(0, 0, "-" * w)
+        self.win_chatline.clear()
         start = len(self.inputbuffer) - w + 1
         if start < 0:
             start = 0
@@ -78,6 +78,7 @@ class ChatUI:
             self.chatbuffer.append(msg)
 
         self.redraw_chatbuffer()
+        self.win_chatline.cursyncup()
 
     def prompt(self, msg):
         """Prompts the user for input and returns it"""
@@ -87,13 +88,15 @@ class ChatUI:
         res = res[len(msg):]
         return res
 
-    def wait_input(self):
+    def wait_input(self, prompt=""):
         """
 
         Wait for the user to input a message and hit enter.
         Returns the message
 
         """
+        self.inputbuffer = prompt
+        self.redraw_chatline()
         self.win_chatline.cursyncup()
         last = -1
         while last != ord('\n'):
@@ -101,13 +104,12 @@ class ChatUI:
             if last == ord('\n'):
                 tmp = self.inputbuffer
                 self.inputbuffer = ""
-                self.win_chatline.clear()
                 self.redraw_chatline()
                 self.win_chatline.cursyncup()
-                return tmp
+                return tmp[len(prompt):]
             elif last == curses.KEY_BACKSPACE or last == 127:
-                self.inputbuffer = self.inputbuffer[:-1]
-                self.win_chatline.clear()
+                if len(self.inputbuffer) > len(prompt):
+                    self.inputbuffer = self.inputbuffer[:-1]
             else:
                 self.inputbuffer += chr(last)
             self.redraw_chatline()
