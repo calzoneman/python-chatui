@@ -1,39 +1,57 @@
 import curses
 
 class ChatUI:
-    def __init__(self, stdscr):
+    def __init__(self, stdscr, userlist_width=16):
         self.stdscr = stdscr
         self.userlist = []
-        self.win_userlist = stdscr.derwin(curses.LINES - 1, 16, 0, 0)
         self.inputbuffer = ""
-        self.win_chatline = stdscr.derwin(2, curses.COLS, 
-                                          curses.LINES - 2, 0)
-        self._draw_chatline()
         self.chatbuffer = []
-        self.win_chatbuffer = stdscr.derwin(curses.LINES - 2,
-                                            curses.COLS - 16,
-                                            0,
-                                            16)
 
-    def _draw_chatline(self):
+        # Curses, why must you confuse me with your height, width, y, x
+        userlist_hwyx = (curses.LINES - 2, userlist_width - 1, 0, 0)
+        chatbuffer_hwyx = (curses.LINES - 2, curses.COLS-userlist_width-1,
+                           0, userlist_width + 1)
+        chatline_yx = (curses.LINES - 1, 0)
+        self.win_userlist = stdscr.derwin(*userlist_hwyx)
+        self.win_chatline = stdscr.derwin(*chatline_yx)
+        self.win_chatbuffer = stdscr.derwin(*chatbuffer_hwyx)
+        
+        self.redraw_ui()
+
+    def redraw_ui(self):
+        """Redraws the entire UI"""
+        u_h, u_w = self.win_userlist.getmaxyx()
+        self.stdscr.vline(0, u_w + 1, "|", curses.LINES - 2)
+        self.stdscr.hline(curses.LINES - 2, 0, "-", curses.COLS)
+        self.stdscr.refresh()
+
+        self.redraw_userlist()
+        self.redraw_chatbuffer()
+        self.redraw_chatline()
+
+    def redraw_chatline(self):
+        """Redraw the user input textbox"""
         h, w = self.win_chatline.getmaxyx()
-        self.win_chatline.addstr(0, 0, "-" * w)
-        self.win_chatline.addstr(1, 0, self.inputbuffer)
+        #self.win_chatline.addstr(0, 0, "-" * w)
+        start = len(self.inputbuffer) - w + 1
+        if start < 0:
+            start = 0
+        self.win_chatline.addstr(0, 0, self.inputbuffer[start:])
         self.win_chatline.refresh()
 
-    def _draw_userlist(self):
+    def redraw_userlist(self):
+        """Redraw the userlist"""
+        self.win_userlist.clear()
         h, w = self.win_userlist.getmaxyx()
         for i, name in enumerate(self.userlist):
             if i >= h:
                 break
-            name = name.ljust(15) + "|"
+            #name = name.ljust(w - 1) + "|"
             self.win_userlist.addstr(i, 0, name)
-        if len(self.userlist) < h:
-            for i in range(len(self.userlist), h - 1):
-                self.win_userlist.addstr(i, 0, " " * 15 + "|")
         self.win_userlist.refresh()
 
-    def _draw_chatbuffer(self):
+    def redraw_chatbuffer(self):
+        """Redraw the chat message buffer"""
         self.win_chatbuffer.clear()
         h, w = self.win_chatbuffer.getmaxyx()
         j = len(self.chatbuffer) - h
@@ -44,33 +62,38 @@ class ChatUI:
             j += 1
         self.win_chatbuffer.refresh()
 
-    def userlist_add(self, name):
-        inserted = False
-        for i in range(len(self.userlist)):
-            if self.userlist[i].lower() >= name.lower():
-                self.userlist.insert(i, name)
-                inserted = True
-                break
-        if not inserted:
-            self.userlist.append(name)
-
-        self._draw_userlist()
-
-    def userlist_remove(self, name):
-        self.userlist.remove(name)
-        self._draw_userlist()
-
     def chatbuffer_add(self, msg):
-        w = curses.COLS - 17
+        """
+
+        Add a message to the chat buffer, automatically slicing it to
+        fit the width of the buffer
+
+        """
+        u_h, u_w = self.win_userlist.getmaxyx()
+        w = curses.COLS - u_w
         while len(msg) >= w:
             self.chatbuffer.append(msg[:w])
             msg = msg[w:]
         if msg:
             self.chatbuffer.append(msg)
 
-        self._draw_chatbuffer()
+        self.redraw_chatbuffer()
+
+    def prompt(self, msg):
+        """Prompts the user for input and returns it"""
+        self.inputbuffer = msg
+        self.redraw_chatline()
+        res = self.wait_input()
+        res = res[len(msg):]
+        return res
 
     def wait_input(self):
+        """
+
+        Wait for the user to input a message and hit enter.
+        Returns the message
+
+        """
         self.win_chatline.cursyncup()
         last = -1
         while last != ord('\n'):
@@ -79,12 +102,12 @@ class ChatUI:
                 tmp = self.inputbuffer
                 self.inputbuffer = ""
                 self.win_chatline.clear()
-                self._draw_chatline()
+                self.redraw_chatline()
                 self.win_chatline.cursyncup()
                 return tmp
-            elif last == curses.KEY_BACKSPACE:
+            elif last == curses.KEY_BACKSPACE or last == 127:
                 self.inputbuffer = self.inputbuffer[:-1]
                 self.win_chatline.clear()
             else:
                 self.inputbuffer += chr(last)
-            self._draw_chatline()
+            self.redraw_chatline()

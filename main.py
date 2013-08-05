@@ -1,10 +1,12 @@
 from curses import wrapper
+from ui import ChatUI
 
 def main(stdscr):
-    from ui import ChatUI
     stdscr.clear()
     ui = ChatUI(stdscr)
-    ui.userlist_add("!calzoneman")
+    name = ui.prompt("Username: ")
+    ui.userlist.append(name)
+    ui.redraw_userlist()
     inp = ""
     while inp != "/quit":
         inp = ui.wait_input()
