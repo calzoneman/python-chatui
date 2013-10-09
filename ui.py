@@ -12,11 +12,12 @@ class ChatUI:
         self.inputbuffer = ""
         self.chatbuffer = []
         self.h, self.w = self.stdscr.getmaxyx()
+        self.tabhandler = lambda: None
 
         if userlist_width > 0:
             self.userlist_width = userlist_width
             self.hide_userlist = False
-            self.want_userlist = False
+            self.want_userlist = True
             cbw = self.w - userlist_width - 1
             self.win_chatbuffer = stdscr.derwin(self.h - 2, cbw, 0, 0)
             self.win_userlist = stdscr.derwin(self.h - 2, userlist_width,
@@ -24,7 +25,7 @@ class ChatUI:
         else:
             self.userlist_width = 0
             self.hide_userlist = True
-            self.want_userlist = True
+            self.want_userlist = False
             self.win_chatbuffer = stdscr.derwin(self.h - 2, self.w, 0, 0)
 
         self.win_chatline = stdscr.derwin(self.h - 1, 0)
@@ -39,7 +40,7 @@ class ChatUI:
         if self.userlist_width >= w - 1:
             self.hide_userlist = True
         else:
-            self.hide_userlist = self.want_userlist
+            self.hide_userlist = not self.want_userlist
 
         self.win_chatline.mvderwin(h - 1, 0)
         self.win_chatline.mvwin(h - 1, 0)
@@ -80,6 +81,15 @@ class ChatUI:
             start = 0
         self.win_chatline.addstr(0, 0, self.inputbuffer[start:])
         self.win_chatline.refresh()
+
+    def set_userlist_visible(self, visible):
+        self.hide_userlist = not visible
+        self.want_userlist = visible
+        if self.hide_userlist:
+            self.win_chatbuffer.resize(self.h - 2, self.w)
+        else:
+            cbw = self.w - self.userlist_width - 1
+            self.win_chatbuffer.resize(self.h - 2, cbw)
 
     def redraw_userlist(self):
         if self.hide_userlist:
@@ -155,6 +165,8 @@ class ChatUI:
                     self.inputbuffer = self.inputbuffer[:-1]
             elif last == curses.KEY_RESIZE:
                 self.resize()
+            elif last == ord('\t'):
+                self.tabhandler()
             elif 32 <= last <= 126:
                 self.inputbuffer += chr(last)
             self.redraw_chatline()
