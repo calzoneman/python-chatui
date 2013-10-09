@@ -41,12 +41,14 @@ class ChatUI:
         else:
             self.hide_userlist = self.want_userlist
 
+        self.win_chatline.mvderwin(h - 1, 0)
         self.win_chatline.mvwin(h - 1, 0)
         self.win_chatline.resize(1, w)
 
         if not self.hide_userlist:
             cbw = w - self.userlist_width - 1
             self.win_chatbuffer.resize(h - 2, cbw)
+            self.win_userlist.mvderwin(0, cbw + 1)
             self.win_userlist.mvwin(0, cbw + 1)
             self.win_userlist.resize(h - 2, self.userlist_width)
         else:
@@ -86,7 +88,6 @@ class ChatUI:
         self.win_userlist.clear()
 
         h, w = self.win_userlist.getmaxyx()
-        dbg((self.win_userlist.getbegyx(), (self.w, self.h)))
         i = 0
         for name in self.userlist[:h]:
             self.win_userlist.addstr(i, 0, name[:w])
