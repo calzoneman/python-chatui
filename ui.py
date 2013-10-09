@@ -1,5 +1,9 @@
 import curses
 
+stderr = open("stderr.txt", "w")
+def dbg(s):
+    print(s, file=stderr)
+
 class ChatUI:
     def __init__(self, stdscr, userlist_width=16):
         self.stdscr = stdscr
@@ -7,45 +11,31 @@ class ChatUI:
         self.inputbuffer = ""
         self.linebuffer = []
         self.chatbuffer = []
-
-        # Curses, why must you confuse me with your height, width, y, x
-        userlist_hwyx = (curses.LINES - 2, userlist_width - 1, 0, 0)
-        chatbuffer_hwyx = (curses.LINES - 2, curses.COLS-userlist_width-1,
-                           0, userlist_width + 1)
-        chatline_yx = (curses.LINES - 1, 0)
-        self.win_userlist = stdscr.derwin(*userlist_hwyx)
-        self.win_chatline = stdscr.derwin(*chatline_yx)
-        self.win_chatbuffer = stdscr.derwin(*chatbuffer_hwyx)
-        
+        self.h, self.w = self.stdscr.getmaxyx()
+        self.win_chatbuffer = stdscr.derwin(self.h - 2, self.w, 0, 0)
+        self.win_chatline = stdscr.derwin(self.h - 1, 0)
         self.redraw_ui()
 
     def resize(self):
         """Handles a change in terminal size"""
-        u_h, u_w = self.win_userlist.getmaxyx()
         h, w = self.stdscr.getmaxyx()
 
         self.win_chatline.mvwin(h - 1, 0)
         self.win_chatline.resize(1, w)
 
-        self.win_userlist.resize(h - 2, u_w)
-        self.win_chatbuffer.resize(h - 2, w - u_w - 2)
+        self.win_chatbuffer.resize(h - 2, w)
 
         self.linebuffer = []
-        for msg in self.chatbuffer:
-            self._linebuffer_add(msg)
-
         self.redraw_ui()
 
     def redraw_ui(self):
         """Redraws the entire UI"""
         h, w = self.stdscr.getmaxyx()
-        u_h, u_w = self.win_userlist.getmaxyx()
+
         self.stdscr.clear()
-        self.stdscr.vline(0, u_w + 1, "|", h - 2)
         self.stdscr.hline(h - 2, 0, "-", w)
         self.stdscr.refresh()
 
-        self.redraw_userlist()
         self.redraw_chatbuffer()
         self.redraw_chatline()
 
@@ -59,27 +49,22 @@ class ChatUI:
         self.win_chatline.addstr(0, 0, self.inputbuffer[start:])
         self.win_chatline.refresh()
 
-    def redraw_userlist(self):
-        """Redraw the userlist"""
-        self.win_userlist.clear()
-        h, w = self.win_userlist.getmaxyx()
-        for i, name in enumerate(self.userlist):
-            if i >= h:
-                break
-            #name = name.ljust(w - 1) + "|"
-            self.win_userlist.addstr(i, 0, name[:w - 1])
-        self.win_userlist.refresh()
-
     def redraw_chatbuffer(self):
         """Redraw the chat message buffer"""
         self.win_chatbuffer.clear()
         h, w = self.win_chatbuffer.getmaxyx()
-        j = len(self.linebuffer) - h
-        if j < 0:
-            j = 0
-        for i in range(min(h, len(self.linebuffer))):
-            self.win_chatbuffer.addstr(i, 0, self.linebuffer[j])
-            j += 1
+        lines = []
+        for msg in self.chatbuffer[-1:-h:-1][::-1]:
+            while len(msg) > w:
+                lines.append(msg[:w])
+                msg = msg[w:]
+            else:
+                lines.append(msg)
+        dbg(str(lines))
+        i = 0
+        for msg in lines[-1:-h:-1][::-1]:
+            self.win_chatbuffer.addstr(i, 0, msg)
+            i += 1
         self.win_chatbuffer.refresh()
 
     def chatbuffer_add(self, msg):
@@ -90,20 +75,9 @@ class ChatUI:
 
         """
         self.chatbuffer.append(msg)
-        self._linebuffer_add(msg)
         self.redraw_chatbuffer()
         self.redraw_chatline()
         self.win_chatline.cursyncup()
-
-    def _linebuffer_add(self, msg):
-        h, w = self.stdscr.getmaxyx()
-        u_h, u_w = self.win_userlist.getmaxyx()
-        w = w - u_w - 2
-        while len(msg) >= w:
-            self.linebuffer.append(msg[:w])
-            msg = msg[w:]
-        if msg:
-            self.linebuffer.append(msg)
 
     def prompt(self, msg):
         """Prompts the user for input and returns it"""
