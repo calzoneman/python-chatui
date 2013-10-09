@@ -3,41 +3,71 @@ import curses
 stderr = open("stderr.txt", "w")
 def dbg(s):
     print(s, file=stderr)
+    stderr.flush()
 
 class ChatUI:
-    def __init__(self, stdscr, userlist_width=16):
+    def __init__(self, stdscr, userlist_width=0):
         self.stdscr = stdscr
         self.userlist = []
         self.inputbuffer = ""
-        self.linebuffer = []
         self.chatbuffer = []
         self.h, self.w = self.stdscr.getmaxyx()
-        self.win_chatbuffer = stdscr.derwin(self.h - 2, self.w, 0, 0)
+
+        if userlist_width > 0:
+            self.userlist_width = userlist_width
+            self.hide_userlist = False
+            self.want_userlist = False
+            cbw = self.w - userlist_width - 1
+            self.win_chatbuffer = stdscr.derwin(self.h - 2, cbw, 0, 0)
+            self.win_userlist = stdscr.derwin(self.h - 2, userlist_width,
+                                              0, cbw + 1)
+        else:
+            self.userlist_width = 0
+            self.hide_userlist = True
+            self.want_userlist = True
+            self.win_chatbuffer = stdscr.derwin(self.h - 2, self.w, 0, 0)
+
         self.win_chatline = stdscr.derwin(self.h - 1, 0)
         self.redraw_ui()
 
     def resize(self):
         """Handles a change in terminal size"""
         h, w = self.stdscr.getmaxyx()
+        self.h = h
+        self.w = w
+
+        if self.userlist_width >= w - 1:
+            self.hide_userlist = True
+        else:
+            self.hide_userlist = self.want_userlist
 
         self.win_chatline.mvwin(h - 1, 0)
         self.win_chatline.resize(1, w)
 
-        self.win_chatbuffer.resize(h - 2, w)
+        if not self.hide_userlist:
+            cbw = w - self.userlist_width - 1
+            self.win_chatbuffer.resize(h - 2, cbw)
+            self.win_userlist.mvwin(0, cbw + 1)
+            self.win_userlist.resize(h - 2, self.userlist_width)
+        else:
+            self.win_chatbuffer.resize(h - 2, w)
 
-        self.linebuffer = []
         self.redraw_ui()
 
     def redraw_ui(self):
         """Redraws the entire UI"""
-        h, w = self.stdscr.getmaxyx()
+        h, w = self.h, self.w
 
         self.stdscr.clear()
         self.stdscr.hline(h - 2, 0, "-", w)
+        if not self.hide_userlist:
+            self.stdscr.vline(0, w - self.userlist_width - 1, "|", h - 2) 
         self.stdscr.refresh()
 
         self.redraw_chatbuffer()
+        self.redraw_userlist()
         self.redraw_chatline()
+        self.win_chatline.cursyncup()
 
     def redraw_chatline(self):
         """Redraw the user input textbox"""
@@ -48,6 +78,20 @@ class ChatUI:
             start = 0
         self.win_chatline.addstr(0, 0, self.inputbuffer[start:])
         self.win_chatline.refresh()
+
+    def redraw_userlist(self):
+        if self.hide_userlist:
+            return
+
+        self.win_userlist.clear()
+
+        h, w = self.win_userlist.getmaxyx()
+        dbg((self.win_userlist.getbegyx(), (self.w, self.h)))
+        i = 0
+        for name in self.userlist[:h]:
+            self.win_userlist.addstr(i, 0, name[:w])
+            i += 1
+        self.win_userlist.refresh()
 
     def redraw_chatbuffer(self):
         """Redraw the chat message buffer"""
@@ -60,7 +104,6 @@ class ChatUI:
                 msg = msg[w:]
             else:
                 lines.append(msg)
-        dbg(str(lines))
         i = 0
         for msg in lines[-1:-h:-1][::-1]:
             self.win_chatbuffer.addstr(i, 0, msg)
